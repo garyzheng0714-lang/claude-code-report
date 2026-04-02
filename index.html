@@ -1,0 +1,2065 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code 源码深度解读 — 写给编程新手的架构之美</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   CSS Custom Properties — 全局设计令牌
+   ═══════════════════════════════════════════════ */
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #0f1520;
+  --bg-card: #131a2b;
+  --bg-code: #0d1220;
+  --bg-code-header: #1a2332;
+  --border: #1e293b;
+  --border-glow: #334155;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-cyan: #06b6d4;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --accent-orange: #f97316;
+  --gradient-hero: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #0c1222 100%);
+  --gradient-accent: linear-gradient(135deg, #8b5cf6, #3b82f6);
+  --gradient-warm: linear-gradient(135deg, #f97316, #f43f5e);
+  --gradient-cool: linear-gradient(135deg, #06b6d4, #8b5cf6);
+  --shadow-lg: 0 20px 60px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 40px rgba(59,130,246,0.15);
+  --radius: 12px;
+  --radius-lg: 20px;
+  --font-sans: 'Noto Sans SC', 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ═══════════════════════════════════════════════
+   Reset & Base
+   ═══════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-glow) transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.8;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 3px; }
+
+/* ═══════════════════════════════════════════════
+   Typography
+   ═══════════════════════════════════════════════ */
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.3; }
+h1 { font-size: clamp(2rem, 5vw, 3.5rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.2rem); }
+h3 { font-size: 1.3rem; }
+
+a { color: var(--accent-blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+code {
+  font-family: var(--font-mono);
+  background: var(--bg-code);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.88em;
+  color: var(--accent-cyan);
+}
+
+/* ═══════════════════════════════════════════════
+   Layout
+   ═══════════════════════════════════════════════ */
+.container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+section {
+  padding: 80px 0;
+  position: relative;
+}
+
+section + section {
+  border-top: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════
+   Hero Section
+   ═══════════════════════════════════════════════ */
+.hero {
+  background: var(--gradient-hero);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 60px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 800px 600px at 30% 20%, rgba(139,92,246,0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 500px at 70% 80%, rgba(59,130,246,0.1) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(139,92,246,0.15);
+  border: 1px solid rgba(139,92,246,0.3);
+  padding: 6px 18px;
+  border-radius: 50px;
+  font-size: 0.85rem;
+  color: var(--accent-purple);
+  margin-bottom: 32px;
+  font-weight: 500;
+  position: relative;
+  z-index: 1;
+}
+
+.hero h1 {
+  background: linear-gradient(135deg, #fff 0%, #a5b4fc 50%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-subtitle {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  color: var(--text-secondary);
+  max-width: 700px;
+  margin-bottom: 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-stats {
+  display: flex;
+  gap: 48px;
+  flex-wrap: wrap;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.hero-scroll {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(8px); }
+}
+
+/* ═══════════════════════════════════════════════
+   Navigation
+   ═══════════════════════════════════════════════ */
+.toc {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 32px 40px;
+  margin: -40px auto 0;
+  max-width: 900px;
+  position: relative;
+  z-index: 10;
+  box-shadow: var(--shadow-lg);
+}
+
+.toc h3 {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+}
+
+.toc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.92rem;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.toc-item:hover {
+  background: rgba(59,130,246,0.1);
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.toc-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--gradient-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════
+   Section Headers
+   ═══════════════════════════════════════════════ */
+.section-header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.section-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  margin: 0 auto 20px;
+}
+
+.section-header h2 {
+  margin-bottom: 12px;
+}
+
+.section-header p {
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+  font-size: 1.05rem;
+}
+
+/* ═══════════════════════════════════════════════
+   Side-by-Side Layout (核心左右分栏)
+   ═══════════════════════════════════════════════ */
+.split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  margin: 40px 0;
+  align-items: start;
+}
+
+.split-explain {
+  padding: 28px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  position: sticky;
+  top: 24px;
+}
+
+.split-explain h3 {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.split-explain p {
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.split-explain .highlight-box {
+  background: rgba(59,130,246,0.08);
+  border-left: 3px solid var(--accent-blue);
+  padding: 14px 18px;
+  border-radius: 0 8px 8px 0;
+  margin: 16px 0;
+  font-size: 0.92rem;
+}
+
+.split-explain .highlight-box.green {
+  background: rgba(16,185,129,0.08);
+  border-left-color: var(--accent-green);
+}
+
+.split-explain .highlight-box.amber {
+  background: rgba(245,158,11,0.08);
+  border-left-color: var(--accent-amber);
+}
+
+.split-explain .highlight-box.purple {
+  background: rgba(139,92,246,0.08);
+  border-left-color: var(--accent-purple);
+}
+
+.metaphor {
+  background: linear-gradient(135deg, rgba(249,115,22,0.08), rgba(244,63,94,0.06));
+  border: 1px solid rgba(249,115,22,0.2);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  margin: 20px 0;
+  font-size: 0.95rem;
+}
+
+.metaphor-title {
+  font-weight: 600;
+  color: var(--accent-orange);
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* ═══════════════════════════════════════════════
+   Code Blocks
+   ═══════════════════════════════════════════════ */
+.code-block {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.code-header {
+  background: var(--bg-code-header);
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+}
+
+.code-header .filename {
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.code-header .lang-tag {
+  background: rgba(139,92,246,0.15);
+  color: var(--accent-purple);
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.code-body {
+  padding: 20px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.75;
+  color: #e2e8f0;
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* Syntax Highlighting (手写轻量版) */
+.kw { color: #c084fc; }          /* keyword: const, async, if, return */
+.fn { color: #60a5fa; }          /* function name */
+.str { color: #34d399; }         /* string */
+.cm { color: #64748b; font-style: italic; }  /* comment */
+.num { color: #fbbf24; }         /* number */
+.type { color: #38bdf8; }        /* type */
+.op { color: #94a3b8; }          /* operator */
+.prop { color: #f9a8d4; }        /* property */
+.param { color: #fdba74; }       /* parameter */
+.ann { color: #64748b; }         /* annotation / decorator */
+.cn { color: #f43f5e; }          /* comment-note (中文注释) */
+
+/* ═══════════════════════════════════════════════
+   Architecture Diagram (CSS 版流程图)
+   ═══════════════════════════════════════════════ */
+.arch-diagram {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 48px 32px;
+  margin: 40px 0;
+  overflow-x: auto;
+}
+
+.flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  flex-wrap: wrap;
+  padding: 12px 0;
+}
+
+.flow-node {
+  padding: 14px 22px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-align: center;
+  min-width: 120px;
+  position: relative;
+  white-space: nowrap;
+}
+
+.flow-arrow {
+  color: var(--text-muted);
+  font-size: 1.4rem;
+  padding: 0 6px;
+  flex-shrink: 0;
+}
+
+.flow-node.blue { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.35); color: var(--accent-blue); }
+.flow-node.purple { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.35); color: var(--accent-purple); }
+.flow-node.green { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.35); color: var(--accent-green); }
+.flow-node.amber { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.35); color: var(--accent-amber); }
+.flow-node.cyan { background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.35); color: var(--accent-cyan); }
+.flow-node.rose { background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.35); color: var(--accent-rose); }
+
+/* ═══════════════════════════════════════════════
+   Vertical Flow Diagram
+   ═══════════════════════════════════════════════ */
+.vflow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 20px 0;
+}
+
+.vflow-node {
+  padding: 16px 32px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: center;
+  min-width: 280px;
+  max-width: 460px;
+  position: relative;
+}
+
+.vflow-arrow {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  padding: 4px 0;
+}
+
+.vflow-branch {
+  display: flex;
+  gap: 24px;
+  align-items: stretch;
+  justify-content: center;
+  margin: 4px 0;
+  flex-wrap: wrap;
+}
+
+.vflow-branch-item {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-align: center;
+  min-width: 140px;
+}
+
+/* ═══════════════════════════════════════════════
+   Layer Diagram (分层架构图)
+   ═══════════════════════════════════════════════ */
+.layers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 700px;
+  margin: 32px auto;
+}
+
+.layer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+
+.layer-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+
+.layer-content {
+  flex: 1;
+}
+
+.layer-title { font-weight: 700; font-size: 0.95rem; }
+.layer-desc { font-size: 0.82rem; opacity: 0.8; margin-top: 2px; }
+
+.layer.l1 { background: linear-gradient(90deg, rgba(244,63,94,0.15), rgba(244,63,94,0.05)); border: 1px solid rgba(244,63,94,0.25); color: #fda4af; }
+.layer.l2 { background: linear-gradient(90deg, rgba(249,115,22,0.15), rgba(249,115,22,0.05)); border: 1px solid rgba(249,115,22,0.25); color: #fdba74; }
+.layer.l3 { background: linear-gradient(90deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05)); border: 1px solid rgba(245,158,11,0.25); color: #fde68a; }
+.layer.l4 { background: linear-gradient(90deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05)); border: 1px solid rgba(16,185,129,0.25); color: #6ee7b7; }
+.layer.l5 { background: linear-gradient(90deg, rgba(59,130,246,0.15), rgba(59,130,246,0.05)); border: 1px solid rgba(59,130,246,0.25); color: #93c5fd; }
+.layer.l6 { background: linear-gradient(90deg, rgba(139,92,246,0.15), rgba(139,92,246,0.05)); border: 1px solid rgba(139,92,246,0.25); color: #c4b5fd; }
+
+/* ═══════════════════════════════════════════════
+   Callout Cards
+   ═══════════════════════════════════════════════ */
+.callout {
+  padding: 24px 28px;
+  border-radius: var(--radius);
+  margin: 28px 0;
+}
+
+.callout-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.callout.insight {
+  background: rgba(139,92,246,0.08);
+  border: 1px solid rgba(139,92,246,0.2);
+}
+.callout.insight .callout-title { color: var(--accent-purple); }
+
+.callout.tip {
+  background: rgba(16,185,129,0.08);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.callout.tip .callout-title { color: var(--accent-green); }
+
+.callout.warning {
+  background: rgba(245,158,11,0.08);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.callout.warning .callout-title { color: var(--accent-amber); }
+
+/* ═══════════════════════════════════════════════
+   Feature Grid
+   ═══════════════════════════════════════════════ */
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin: 40px 0;
+}
+
+.feature-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  transition: all 0.3s;
+}
+
+.feature-card:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+.feature-card h4 {
+  font-size: 1rem;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feature-card p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* ═══════════════════════════════════════════════
+   Footer
+   ═══════════════════════════════════════════════ */
+.footer {
+  text-align: center;
+  padding: 60px 24px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.footer a { color: var(--accent-purple); }
+
+/* ═══════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .split-explain {
+    position: static;
+  }
+  .hero-stats { gap: 24px; }
+  .toc-grid { grid-template-columns: 1fr 1fr; }
+  .flow { gap: 8px; }
+  .flow-arrow { font-size: 1rem; }
+}
+
+@media (max-width: 600px) {
+  .toc-grid { grid-template-columns: 1fr; }
+  .vflow-branch { flex-direction: column; align-items: center; }
+  section { padding: 48px 0; }
+}
+
+/* ═══════════════════════════════════════════════
+   Animations
+   ═══════════════════════════════════════════════ */
+.fade-in {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     HERO — 开篇
+     ═══════════════════════════════════════════════ -->
+<header class="hero">
+  <div class="hero-badge">OPEN SOURCE DEEP DIVE</div>
+  <h1>Claude Code 源码解读</h1>
+  <p class="hero-subtitle">
+    一份写给编程新手的架构解析报告。<br>
+    拆解 Anthropic 官方 CLI 工具的内部设计 —— 从启动引擎到记忆宫殿，<br>
+    用最接地气的比喻，带你看懂工业级 AI 应用的架构之美。
+  </p>
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-number">1,902</div>
+      <div class="stat-label">源码文件</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">9</div>
+      <div class="stat-label">核心子系统</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">25</div>
+      <div class="stat-label">Hook 事件类型</div>
+    </div>
+    <div class="stat">
+      <div class="stat-number">8</div>
+      <div class="stat-label">安全防护层</div>
+    </div>
+  </div>
+  <div class="hero-scroll">向下滚动开始探索<br>&#8595;</div>
+</header>
+
+<!-- ═══════════════════════════════════════════════
+     TABLE OF CONTENTS
+     ═══════════════════════════════════════════════ -->
+<div class="container">
+  <nav class="toc">
+    <h3>导航目录</h3>
+    <div class="toc-grid">
+      <a class="toc-item" href="#overview"><span class="toc-num">1</span>架构全景图</a>
+      <a class="toc-item" href="#startup"><span class="toc-num">2</span>启动引擎</a>
+      <a class="toc-item" href="#message-loop"><span class="toc-num">3</span>消息循环</a>
+      <a class="toc-item" href="#tools"><span class="toc-num">4</span>工具系统</a>
+      <a class="toc-item" href="#permissions"><span class="toc-num">5</span>权限守卫</a>
+      <a class="toc-item" href="#memory"><span class="toc-num">6</span>记忆宫殿</a>
+      <a class="toc-item" href="#hooks"><span class="toc-num">7</span>钩子与自动化</a>
+      <a class="toc-item" href="#rendering"><span class="toc-num">8</span>终端渲染魔法</a>
+      <a class="toc-item" href="#safety"><span class="toc-num">9</span>安全堡垒</a>
+      <a class="toc-item" href="#philosophy"><span class="toc-num">10</span>设计哲学总结</a>
+    </div>
+  </nav>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 1 — 架构全景图
+     ═══════════════════════════════════════════════════════════ -->
+<section id="overview">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(139,92,246,0.15);">&#127959;</div>
+      <h2>架构全景图</h2>
+      <p>把 Claude Code 想象成一座「智能工厂」——每个车间各司其职，传送带串联起整个生产线</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      想象你走进一座超级工厂。门口有<strong>安保系统</strong>（权限守卫），进去后是中央<strong>调度大厅</strong>（消息循环），大厅连接着各个<strong>生产车间</strong>（工具系统），墙上有<strong>监控屏幕</strong>（终端渲染），还有<strong>档案馆</strong>保存着每一次对话的记忆（记忆系统），<strong>质检传送带</strong>在每个环节做检查（Hook 系统）。每生产一件产品，都要过安检才能出厂（安全堡垒）。
+    </div>
+
+    <!-- 主架构分层图 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 28px; color: var(--text-secondary);">Claude Code 六层架构</h3>
+      <div class="layers">
+        <div class="layer l1">
+          <div class="layer-num">1</div>
+          <div class="layer-content">
+            <div class="layer-title">入口层 &middot; Entrypoints</div>
+            <div class="layer-desc">CLI 快速分发 &rarr; 不同模式走不同路径（交互 / 守护进程 / 桥接模式）</div>
+          </div>
+        </div>
+        <div class="layer l2">
+          <div class="layer-num">2</div>
+          <div class="layer-content">
+            <div class="layer-title">引擎层 &middot; QueryEngine</div>
+            <div class="layer-desc">消息循环的心脏 &rarr; 接收用户输入、调用 API、流式输出、工具执行</div>
+          </div>
+        </div>
+        <div class="layer l3">
+          <div class="layer-num">3</div>
+          <div class="layer-content">
+            <div class="layer-title">工具层 &middot; Tool System</div>
+            <div class="layer-desc">40+ 工具的统一接口 &rarr; 编辑文件、执行命令、搜索代码、浏览网页……</div>
+          </div>
+        </div>
+        <div class="layer l4">
+          <div class="layer-num">4</div>
+          <div class="layer-content">
+            <div class="layer-title">安全层 &middot; Permissions + Safety</div>
+            <div class="layer-desc">8 重检查门 &rarr; 规则匹配 &rarr; AI 分类器 &rarr; 用户确认 &rarr; 拒绝追踪</div>
+          </div>
+        </div>
+        <div class="layer l5">
+          <div class="layer-num">5</div>
+          <div class="layer-content">
+            <div class="layer-title">上下文层 &middot; Memory + Context</div>
+            <div class="layer-desc">CLAUDE.md 发现 &rarr; 记忆分类 &rarr; 上下文压缩 &rarr; 缓存分界策略</div>
+          </div>
+        </div>
+        <div class="layer l6">
+          <div class="layer-num">6</div>
+          <div class="layer-content">
+            <div class="layer-title">渲染层 &middot; Ink Terminal UI</div>
+            <div class="layer-desc">React 式组件 &rarr; Yoga 布局 &rarr; 双缓冲差分更新 &rarr; 60FPS 流式输出</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主数据流图 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 28px; color: var(--text-secondary);">一次对话的完整生命周期</h3>
+      <div class="flow">
+        <div class="flow-node blue">用户输入</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node purple">解析斜杠命令</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node cyan">组装系统提示词</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node green">调用 Claude API</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node amber">流式接收响应</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node rose">执行工具调用</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node blue">渲染到终端</div>
+      </div>
+      <div style="text-align:center; margin-top: 16px; color: var(--text-muted); font-size: 0.85rem;">
+        &#8593; 如果 AI 需要更多信息，这个循环会再转一圈 &#8593;
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 2 — 启动引擎
+     ═══════════════════════════════════════════════════════════ -->
+<section id="startup">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(244,63,94,0.15);">&#9889;</div>
+      <h2>启动引擎</h2>
+      <p>Claude Code 的启动设计精妙绝伦 —— 一键启动，0.1 秒内就能响应最简单的命令</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      想象你问一个人"你叫什么名字？"——他不需要翻出身份证、查户口本，<strong>张口就答</strong>。Claude Code 的启动也是这样：如果你只是问 <code>--version</code>，它连重型模块都不加载，直接回答。这叫做 <strong>「快速路径」(Fast Path)</strong>。
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#127937; 快速路径设计</h3>
+        <p>这段代码展示了 Claude Code 启动时的<strong>第一个判断</strong>。它的核心理念是：<strong>能不加载的模块就不加载</strong>。</p>
+
+        <div class="highlight-box">
+          <strong>设计精髓：</strong>当用户只想看版本号时，整个程序只执行 3 行代码就退出了。不会加载上千个模块、不会初始化数据库、不会连接网络。
+        </div>
+
+        <p>后面的代码也是类似思路：不同的命令走不同的"快车道"，每条路只加载自己需要的模块。这就像高速公路的分流匝道——去机场的车不需要经过市区。</p>
+
+        <div class="highlight-box green">
+          <strong>新手要记住的原则：</strong>「延迟加载」(Lazy Loading) —— 只在真正需要时才加载代码，是提升性能的黄金法则。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/entrypoints/cli.tsx</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// Claude Code 的启动入口 —— 一切从这里开始</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">async function</span> <span class="fn">main</span>(): <span class="type">Promise</span>&lt;<span class="type">void</span>&gt; {
+
+  <span class="cm">// 第一步：拿到用户在命令行输入的参数</span>
+  <span class="kw">const</span> <span class="param">args</span> = process.argv.<span class="fn">slice</span>(<span class="num">2</span>)
+
+  <span class="cm">// &#x1F3CE;&#xFE0F; 【快速路径】如果用户只想看版本号</span>
+  <span class="cm">// 直接打印，立刻退出！</span>
+  <span class="cm">// 不加载任何其他模块 —— 极速响应</span>
+  <span class="kw">if</span> (
+    args.length === <span class="num">1</span> &amp;&amp;
+    (args[<span class="num">0</span>] === <span class="str">'--version'</span> ||
+     args[<span class="num">0</span>] === <span class="str">'-v'</span>)
+  ) {
+    console.<span class="fn">log</span>(<span class="str">`${MACRO.VERSION} (Claude Code)`</span>)
+    <span class="kw">return</span> <span class="cm">// &#x1F44B; 用完即走</span>
+  }
+
+  <span class="cm">// 只有走到这里，才开始加载性能追踪器</span>
+  <span class="cm">// 注意：用的是 await import() 动态导入</span>
+  <span class="kw">const</span> { <span class="param">profileCheckpoint</span> } =
+    <span class="kw">await</span> <span class="fn">import</span>(<span class="str">'../utils/startupProfiler.js'</span>)
+  <span class="fn">profileCheckpoint</span>(<span class="str">'cli_entry'</span>)
+
+  <span class="cm">// 接下来根据不同参数，走不同的"快车道"</span>
+  <span class="cm">// 守护进程？桥接模式？模板生成？各走各路</span>
+  <span class="cm">// ...</span>
+}
+
+<span class="fn">main</span>()</div>
+      </div>
+    </div>
+
+    <!-- 启动并行优化 -->
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#9889; 并行预加载</h3>
+        <p>当 Claude Code 真正需要完整启动时，它会<strong>同时做好几件事</strong>，而不是排队一件一件做。</p>
+
+        <div class="highlight-box purple">
+          <strong>核心技巧：</strong>在 JavaScript/TypeScript 中，<code>Promise</code> 可以让多个异步操作同时进行。就像你一边烧水、一边切菜、一边热锅——而不是先烧水等它开了再切菜。
+        </div>
+
+        <p>这段初始化代码在模块还没加载完的时候，就已经开始读取系统配置和钥匙串（密码管理器）了。等模块加载完毕时，配置数据也差不多准备好了，省去了等待时间。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/entrypoints/init.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 初始化阶段 —— 多条线同时开工</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// &#x1F3C3; 在模块还没加载完时，先启动这些"预热"任务</span>
+<span class="cm">// 就像餐厅开门前：水已经在烧、面已经在揉</span>
+
+<span class="cm">// 任务1：读取系统管理配置（MDM 策略）</span>
+<span class="fn">prefetchMDMRawRead</span>()     <span class="cm">// &#x26A1; 不等结果，先发出去</span>
+
+<span class="cm">// 任务2：预取钥匙串中的凭证</span>
+<span class="fn">prefetchKeychain</span>()        <span class="cm">// &#x26A1; 也不等，同时进行</span>
+
+<span class="cm">// 任务3：验证 settings.json 配置</span>
+<span class="fn">enableConfigs</span>()
+
+<span class="cm">// 任务4：仅应用"安全"的环境变量</span>
+<span class="cm">// 注意：信任对话框出现之前，</span>
+<span class="cm">// 不能让项目配置影响环境 —— 这是安全考量</span>
+<span class="fn">applyOnlySafeEnvVars</span>()
+
+<span class="cm">// 任务5：后台异步填充 OAuth、远程设置等</span>
+<span class="cm">// 这些不会阻塞用户交互</span>
+<span class="kw">await</span> Promise.<span class="fn">all</span>([
+  <span class="fn">populateOAuth</span>(),
+  <span class="fn">fetchRemoteSettings</span>(),
+  <span class="fn">loadPolicyLimits</span>(),
+])</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 3 — 消息循环
+     ═══════════════════════════════════════════════════════════ -->
+<section id="message-loop">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(59,130,246,0.15);">&#128260;</div>
+      <h2>消息循环 &middot; 对话的心脏</h2>
+      <p>QueryEngine 是整个 Claude Code 的核心引擎 —— 每一次对话都由它驱动</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      消息循环就像一条<strong>寿司传送带</strong>。你（用户）把需求写在纸条上放上传送带，传送带把它送到厨房（Claude API），厨师做好寿司（响应）一盘一盘放回传送带（流式输出），你一盘一盘地拿（看到回答逐字出现）。如果厨师需要去仓库拿食材（调用工具），传送带会先绕一圈仓库，拿到食材后继续做寿司。
+    </div>
+
+    <!-- 消息循环流程图 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 24px; color: var(--text-secondary);">QueryEngine 消息循环详解</h3>
+      <div class="vflow">
+        <div class="vflow-node blue" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#93c5fd;">
+          &#x1F4DD; 用户发送消息
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node purple" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd;">
+          processUserInput() &mdash; 解析斜杠命令、附件
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node cyan" style="background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.3); color:#67e8f9;">
+          &#x1F4AC; 推入 mutableMessages 数组（先保存到磁盘，确保可恢复！）
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node green" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7;">
+          &#x1F916; 调用 Claude API（AsyncGenerator 流式返回）
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-branch">
+          <div class="vflow-branch-item" style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.25); color:#fcd34d;">
+            &#x1F4AC; 普通文本回复<br><small>直接渲染到终端</small>
+          </div>
+          <div class="vflow-branch-item" style="background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.25); color:#fda4af;">
+            &#x1F527; 工具调用请求<br><small>执行工具 &rarr; 结果送回 API</small>
+          </div>
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node amber" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fcd34d;">
+          &#x2714;&#xFE0F; 一轮对话结束（或继续下一轮工具调用）
+        </div>
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F3A3; AsyncGenerator — 流式魔法</h3>
+        <p>这是 Claude Code 最核心的设计之一。<code>submitMessage</code> 不是等 AI 完全回答完再一次性返回，而是像水龙头一样，<strong>来一滴返回一滴</strong>。</p>
+
+        <div class="highlight-box">
+          <strong>什么是 AsyncGenerator？</strong> 想象一个水龙头。普通函数是一桶水——要等装满了才能用。AsyncGenerator 是自来水管——打开就有水流出来，随来随用。
+        </div>
+
+        <p>关键字 <code>async *</code> 和 <code>yield</code> 让这个函数可以一边从 API 接收数据，一边把数据交给 UI 渲染。用户看到的就是文字一个字一个字地出现。</p>
+
+        <div class="highlight-box green">
+          <strong>妙处在于：</strong><code>mutableMessages</code> 是一个<strong>共享的可变数组</strong>。消息在发给 API 之前就已经保存到磁盘了——即使程序意外崩溃，下次启动也能恢复对话！
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/QueryEngine.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// QueryEngine —— 整个 Claude Code 的心脏</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export class</span> <span class="type">QueryEngine</span> {
+
+  <span class="cm">// &#x1F4E6; 共享消息存储 —— 跨轮次保持对话历史</span>
+  <span class="cm">// 就像聊天记录一样，所有消息都存在这里</span>
+  <span class="prop">mutableMessages</span>: <span class="type">Message</span>[]
+
+  <span class="cm">// &#x1F6D1; 中止控制器 —— 可以随时喊停</span>
+  <span class="prop">abortController</span>: <span class="type">AbortController</span>
+
+  <span class="cm">// &#x274C; 记录每次权限被拒绝的情况</span>
+  <span class="prop">permissionDenials</span>: <span class="type">PermissionDenial</span>[]
+
+  <span class="cm">// &#x1F3A3; 核心方法：提交一条消息</span>
+  <span class="cm">// 注意 async * —— 这是 AsyncGenerator！</span>
+  <span class="cm">// 它不会等回答完毕，而是边收边返</span>
+  <span class="kw">async</span> *<span class="fn">submitMessage</span>(
+    <span class="param">prompt</span>: <span class="type">string</span>,
+    <span class="param">options</span>?: { uuid?: <span class="type">string</span> }
+  ): <span class="type">AsyncGenerator</span>&lt;<span class="type">SDKMessage</span>&gt; {
+
+    <span class="cm">// 第一步：处理用户输入</span>
+    <span class="cm">// 识别斜杠命令、附件、特殊指令</span>
+    <span class="kw">const</span> { <span class="param">messages</span>, <span class="param">shouldQuery</span> } =
+      <span class="kw">await</span> <span class="fn">processUserInput</span>({ input: prompt })
+
+    <span class="cm">// &#x1F4BE; 先保存！再调 API</span>
+    <span class="cm">// 即使 API 调用中断，消息也不会丢</span>
+    <span class="kw">this</span>.mutableMessages.<span class="fn">push</span>(...messages)
+
+    <span class="cm">// 第二步：组装系统提示词</span>
+    <span class="kw">const</span> { <span class="param">defaultSystemPrompt</span>, <span class="param">userContext</span> }
+      = <span class="kw">await</span> <span class="fn">fetchSystemPromptParts</span>({...})
+
+    <span class="cm">// 第三步：调用 API 并流式返回结果</span>
+    <span class="cm">// yield* 把 query() 的每一条消息都转发出去</span>
+    <span class="kw">yield</span>* <span class="fn">query</span>({
+      messages: <span class="kw">this</span>.mutableMessages,
+      systemPrompt,
+      canUseTool: wrappedCanUseTool,
+    })
+  }
+}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 4 — 工具系统
+     ═══════════════════════════════════════════════════════════ -->
+<section id="tools">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(16,185,129,0.15);">&#x1F527;</div>
+      <h2>工具系统 &middot; 万能工具箱</h2>
+      <p>Claude Code 有 40+ 种工具，但它们共享同一套优雅的接口设计</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      工具系统就像一个<strong>标准化的工具箱</strong>。无论是螺丝刀、锤子还是电钻，它们的手柄都是统一规格的——你只需要学会握手柄的方式，就能使用任何工具。在 Claude Code 中，这个"统一的手柄"就是 <code>Tool</code> 接口。每个工具都实现了相同的方法：<code>call</code>（使用工具）、<code>description</code>（说明书）、<code>inputSchema</code>（需要什么原料）。
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F3D7;&#xFE0F; Tool 接口 — 万物之母</h3>
+        <p>这是 Claude Code 中<strong>最重要的类型定义之一</strong>。所有工具——编辑文件、执行命令、搜索代码——都必须实现这个接口。</p>
+
+        <div class="highlight-box">
+          <strong>为什么这样设计？</strong> 统一接口让系统可以<strong>一视同仁地对待所有工具</strong>。添加新工具只需要实现这几个方法，不需要改动系统其他部分。这就是面向对象设计中的 <strong>「开闭原则」</strong>：对扩展开放，对修改关闭。
+        </div>
+
+        <p>特别注意这些巧妙的属性：</p>
+        <ul style="color: var(--text-secondary); font-size: 0.92rem; padding-left: 20px;">
+          <li><code>isConcurrencySafe</code> — 这个工具能否和别的工具同时执行？</li>
+          <li><code>isReadOnly</code> — 只读操作不需要权限确认</li>
+          <li><code>shouldDefer</code> — 大型工具延迟加载，节省启动时间</li>
+          <li><code>aliases</code> — 工具改名后旧名字仍然可用</li>
+        </ul>
+
+        <div class="highlight-box amber">
+          <strong>架构启示：</strong>好的接口设计让每个工具都能「自我描述」——系统不需要知道工具的具体实现，只需要问它几个问题就能做出正确的调度决策。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/Tool.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// Tool 接口 —— 所有工具的"标准化手柄"</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export type</span> <span class="type">Tool</span>&lt;<span class="type">Input</span>, <span class="type">Output</span>&gt; = {
+
+  <span class="cm">// &#x1F4DB; 别名：工具改名后旧名字仍能用</span>
+  <span class="cm">// 就像手机号码变了，但旧号码还能转接</span>
+  <span class="prop">aliases</span>?: <span class="type">string</span>[]
+
+  <span class="cm">// &#x1F50D; 搜索提示词：帮 AI 找到正确的工具</span>
+  <span class="prop">searchHint</span>?: <span class="type">string</span>
+
+  <span class="cm">// &#x1F3AF; 核心方法：真正执行工具的地方</span>
+  <span class="fn">call</span>(
+    args: <span class="type">Input</span>,      <span class="cm">// 输入参数</span>
+    context: <span class="type">Context</span>,  <span class="cm">// 运行环境</span>
+    canUseTool: <span class="type">Fn</span>,    <span class="cm">// 权限检查函数</span>
+  ): <span class="type">Promise</span>&lt;<span class="type">ToolResult</span>&gt;
+
+  <span class="cm">// &#x1F4C4; 动态描述：根据输入内容生成说明</span>
+  <span class="fn">description</span>(input: <span class="type">Input</span>): <span class="type">Promise</span>&lt;<span class="type">string</span>&gt;
+
+  <span class="cm">// &#x1F4CB; 输入校验规则（Zod Schema）</span>
+  <span class="kw">readonly</span> <span class="prop">inputSchema</span>: <span class="type">ZodSchema</span>
+
+  <span class="cm">// === 智能调度属性 ===</span>
+
+  <span class="cm">// &#x1F91D; 能否与其他工具并行执行？</span>
+  <span class="cm">// 例如：两个 Read 可以同时跑，</span>
+  <span class="cm">// 但两个 Edit 不行（可能改同一个文件）</span>
+  <span class="fn">isConcurrencySafe</span>(input: <span class="type">Input</span>): <span class="type">boolean</span>
+
+  <span class="cm">// &#x1F512; 是否只读？只读操作可以跳过权限确认</span>
+  <span class="fn">isReadOnly</span>(input: <span class="type">Input</span>): <span class="type">boolean</span>
+
+  <span class="cm">// &#x1F4A3; 是否有破坏性？破坏性操作需要用户确认</span>
+  <span class="fn">isDestructive</span>?(input: <span class="type">Input</span>): <span class="type">boolean</span>
+
+  <span class="cm">// &#x23F3; 是否延迟加载？</span>
+  <span class="cm">// 大型工具的 Schema 很大，</span>
+  <span class="cm">// 延迟到真正使用时才加载，加速启动</span>
+  <span class="prop">shouldDefer</span>?: <span class="type">boolean</span>
+}</div>
+      </div>
+    </div>
+
+    <!-- Feature Gate 代码 -->
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F6AA; 特性门控 — 编译时裁剪</h3>
+        <p>Claude Code 有很多内部专用功能。它用 <strong>Feature Gate</strong> 在<strong>编译时</strong>就把不需要的代码删掉，而不是运行时判断。</p>
+
+        <div class="highlight-box purple">
+          <strong>什么是「死代码消除」(DCE)?</strong> 想象你出版一本书。内部版有所有章节，公开版只保留公开章节。传统做法是把删掉的章节用墨水涂黑（运行时判断），但 Claude Code 的做法是<strong>直接不印那些页</strong>（编译时消除）。最终产物更小、更快、更安全。
+        </div>
+
+        <p><code>feature()</code> 是一个编译时函数。当编译器看到 <code>feature('PROACTIVE') === false</code> 时，整个 <code>if</code> 分支和相关的 <code>require</code> 都会被删除——最终的发布版本中根本不存在这些代码。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/tools.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 工具注册表 —— 特性门控 + 死代码消除</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// &#x1F6AA; feature() 是编译时的"开关"</span>
+<span class="cm">// 如果 PROACTIVE 功能关闭，</span>
+<span class="cm">// 下面的代码会在编译时被完全删除！</span>
+
+<span class="kw">const</span> <span class="param">SleepTool</span> =
+  <span class="fn">feature</span>(<span class="str">'PROACTIVE'</span>) || <span class="fn">feature</span>(<span class="str">'KAIROS'</span>)
+    ? <span class="fn">require</span>(<span class="str">'./tools/SleepTool'</span>).SleepTool
+    : <span class="kw">null</span>   <span class="cm">// &#x1F6AB; 公开版：这行都不存在</span>
+
+<span class="cm">// &#x1F5C2;&#xFE0F; 条件性地加载整组工具</span>
+<span class="kw">const</span> <span class="param">cronTools</span> = <span class="fn">feature</span>(<span class="str">'AGENT_TRIGGERS'</span>)
+  ? [CronCreateTool, CronDeleteTool, CronListTool]
+  : []  <span class="cm">// 空数组 = 不注册这些工具</span>
+
+<span class="cm">// &#x1F527; 最终的工具列表</span>
+<span class="cm">// 只包含当前构建版本支持的工具</span>
+<span class="kw">const</span> <span class="param">allTools</span> = [
+  ReadTool,
+  EditTool,
+  WriteTool,
+  BashTool,
+  GlobTool,
+  GrepTool,
+  ...cronTools,              <span class="cm">// 有条件展开</span>
+  ...(SleepTool ? [SleepTool] : []),
+].<span class="fn">filter</span>(Boolean)  <span class="cm">// 过滤掉 null</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 5 — 权限守卫
+     ═══════════════════════════════════════════════════════════ -->
+<section id="permissions">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(245,158,11,0.15);">&#x1F6E1;&#xFE0F;</div>
+      <h2>权限守卫 &middot; 八重安检门</h2>
+      <p>每个工具调用都要过「八重门」—— 确保 AI 永远不会做出超出授权的事情</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      权限系统就像<strong>机场安检</strong>。你的行李（工具调用）要过好几道关卡：先是身份验证（规则匹配），然后 X 光机扫描（AI 分类器判断安全性），可疑物品要开箱检查（用户确认弹窗），危险品直接扣留（拒绝执行）。最巧妙的是：如果 AI 分类器连续拒绝太多次，系统会自动切换到"人工检查"模式——因为可能是分类器出了问题。
+    </div>
+
+    <!-- 权限决策树 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 24px; color: var(--text-secondary);">权限决策树 —— 一个工具调用要过几道关？</h3>
+      <div class="vflow">
+        <div class="vflow-node green" style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7;">
+          &#x1F527; AI 想调用一个工具
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node blue" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#93c5fd;">
+          &#9312; 工具自身的权限检查（checkPermissions）
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node purple" style="background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.3); color:#c4b5fd;">
+          &#9313; 规则匹配（allow / ask / deny 规则）
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node cyan" style="background:rgba(6,182,212,0.15); border:1px solid rgba(6,182,212,0.3); color:#67e8f9;">
+          &#9314; Hook 检查（PreToolUse 钩子）
+        </div>
+        <div class="vflow-arrow">&#8595; 如果结果是 "ask"</div>
+        <div class="vflow-branch">
+          <div class="vflow-branch-item" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); color:#6ee7b7;">
+            &#x2705; 自动模式<br><small>AI 分类器快速判断</small>
+          </div>
+          <div class="vflow-branch-item" style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.25); color:#fcd34d;">
+            &#x1F4AC; 交互模式<br><small>弹窗询问用户</small>
+          </div>
+          <div class="vflow-branch-item" style="background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.25); color:#fda4af;">
+            &#x1F6AB; 拒绝模式<br><small>直接拒绝执行</small>
+          </div>
+        </div>
+        <div class="vflow-arrow">&#8595;</div>
+        <div class="vflow-node amber" style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fcd34d;">
+          &#9315; 拒绝追踪 —— 连续拒绝过多次？切换到人工确认模式
+        </div>
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F50D; 规则匹配引擎</h3>
+        <p>权限规则是<strong>数据驱动</strong>的——不是在代码里硬写 if/else，而是把规则当作数据来处理。</p>
+
+        <div class="highlight-box">
+          <strong>规则匹配的优先级：</strong>
+          <br>1. <strong>deny</strong>（拒绝）&gt; 2. <strong>ask</strong>（询问）&gt; 3. <strong>allow</strong>（允许）
+          <br>安全性优先！deny 规则永远赢。
+        </div>
+
+        <p>规则支持通配符匹配，比如 <code>Bash(prefix:git *)</code> 表示"允许所有以 git 开头的命令"。这种声明式的规则系统让权限配置变得像写配置文件一样简单。</p>
+
+        <div class="highlight-box amber">
+          <strong>精妙之处：</strong>拒绝追踪机制会记录连续被拒绝的次数。如果 AI 分类器连续拒了 N 次，系统认为"分类器可能搞错了"，会自动退回到让用户手动确认——这是一种<strong>自我纠错</strong>的闭环！
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/utils/permissions/permissions.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 权限决策主函数 —— 八重安检的入口</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export const</span> <span class="fn">hasPermissionsToUseTool</span> =
+  <span class="kw">async</span> (
+    <span class="param">tool</span>,     <span class="cm">// 要检查的工具</span>
+    <span class="param">input</span>,    <span class="cm">// 工具的输入参数</span>
+    <span class="param">context</span>,  <span class="cm">// 运行上下文</span>
+  ): <span class="type">Promise</span>&lt;<span class="type">PermissionDecision</span>&gt; => {
+
+  <span class="cm">// 第一道：核心权限检查</span>
+  <span class="cm">// 包含规则匹配、Hook 检查、分类器</span>
+  <span class="kw">const</span> <span class="param">result</span> = <span class="kw">await</span>
+    <span class="fn">hasPermissionsToUseToolInner</span>(tool, input, context)
+
+  <span class="cm">// 第二道：根据权限模式转换结果</span>
+  <span class="cm">// - Auto 模式 → 让 AI 分类器决定</span>
+  <span class="cm">// - DontAsk 模式 → 把"询问"变成"拒绝"</span>
+  <span class="cm">// - Plan 模式 → 需要方案审批</span>
+
+  <span class="cm">// &#x1F4CA; 第三道：拒绝追踪（自我纠错闭环！）</span>
+  <span class="kw">if</span> (result.behavior !== <span class="str">'allow'</span>) {
+    <span class="cm">// 记录这次拒绝</span>
+    <span class="fn">recordDenial</span>(denialState, ...)
+
+    <span class="cm">// &#x1F914; 连续拒绝太多次了？</span>
+    <span class="cm">// 可能是分类器出了问题！</span>
+    <span class="cm">// 自动切换到"人工确认"模式</span>
+    <span class="kw">if</span> (<span class="fn">shouldFallbackToPrompting</span>(denialState)) {
+      <span class="kw">return</span> { behavior: <span class="str">'ask'</span> }
+        <span class="cm">// &#x2191; 不再自动拒绝，改为问用户</span>
+    }
+  }
+
+  <span class="kw">return</span> result
+}</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 6 — 记忆宫殿
+     ═══════════════════════════════════════════════════════════ -->
+<section id="memory">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(6,182,212,0.15);">&#x1F9E0;</div>
+      <h2>记忆宫殿 &middot; 长期记忆系统</h2>
+      <p>Claude Code 如何记住你是谁、你喜欢什么、上次聊到哪里</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      记忆系统就像一座<strong>图书馆</strong>。最底层的地下室放着"馆规"（系统管理配置），一楼放着你的"个人日记"（用户全局配置），二楼放着"项目手册"（项目级 CLAUDE.md），三楼放着"条件索引卡"（只在特定文件被编辑时才激活的规则），顶层的阁楼放着"AI 自己的笔记本"（自动记忆）。每次对话开始，图书管理员会按顺序把所有相关的书拿出来，摊在桌上给 AI 看。
+    </div>
+
+    <!-- 记忆层级图 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 24px; color: var(--text-secondary);">记忆文件加载优先级（从低到高）</h3>
+      <div class="layers">
+        <div class="layer l6">
+          <div class="layer-num">6</div>
+          <div class="layer-content">
+            <div class="layer-title">AutoMem 自动记忆</div>
+            <div class="layer-desc">AI 自己写的笔记 &rarr; ~/.claude/memory.md &rarr; 用户偏好、项目上下文</div>
+          </div>
+        </div>
+        <div class="layer l5">
+          <div class="layer-num">5</div>
+          <div class="layer-content">
+            <div class="layer-title">Local 本地配置</div>
+            <div class="layer-desc">CLAUDE.local.md &rarr; 不提交到 Git 的私人指令</div>
+          </div>
+        </div>
+        <div class="layer l4">
+          <div class="layer-num">4</div>
+          <div class="layer-content">
+            <div class="layer-title">Project 项目配置 + 条件规则</div>
+            <div class="layer-desc">CLAUDE.md + .claude/rules/*.md &rarr; 可以用 glob 模式按文件路径匹配</div>
+          </div>
+        </div>
+        <div class="layer l3">
+          <div class="layer-num">3</div>
+          <div class="layer-content">
+            <div class="layer-title">User 用户全局配置</div>
+            <div class="layer-desc">~/.claude/CLAUDE.md &rarr; 你对所有项目的通用偏好</div>
+          </div>
+        </div>
+        <div class="layer l2">
+          <div class="layer-num">2</div>
+          <div class="layer-content">
+            <div class="layer-title">Team 团队共享记忆</div>
+            <div class="layer-desc">团队成员共享的约定和规范</div>
+          </div>
+        </div>
+        <div class="layer l1">
+          <div class="layer-num">1</div>
+          <div class="layer-content">
+            <div class="layer-title">Managed 系统策略</div>
+            <div class="layer-desc">/etc/claude-code/CLAUDE.md &rarr; 企业管理员设置的强制策略</div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top: 16px; color: var(--text-muted); font-size: 0.85rem;">
+        &#x2191; 优先级从低到高：管理策略 &lt; 团队 &lt; 用户 &lt; 项目 &lt; 本地 &lt; 自动记忆
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F4DA; @include 指令 — 记忆的"超链接"</h3>
+        <p>Claude Code 的记忆文件支持<strong>互相引用</strong>！就像维基百科的超链接，一个记忆文件可以"导入"另一个文件的内容。</p>
+
+        <div class="highlight-box">
+          <strong>为什么这很重要？</strong>你可以把公共规范放在一个文件里，然后在多个项目的 CLAUDE.md 中引用它。改一处，所有项目自动更新。这就是编程中"不要重复自己"（DRY 原则）的体现。
+        </div>
+
+        <p>系统还内置了<strong>循环引用保护</strong>：最多递归 5 层，防止 A 引用 B、B 又引用 A 导致无限循环。</p>
+
+        <div class="highlight-box green">
+          <strong>条件规则更酷：</strong><code>.claude/rules/</code> 目录下的 Markdown 文件可以设置 <code>paths:</code> 前缀，比如 <code>paths: src/**/*.ts</code>。只有当你编辑匹配这个模式的文件时，这条规则才会生效！就像"只有打开保险箱时才亮起的警告灯"。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/utils/claudemd.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// @include 指令 —— 记忆文件的"超链接"系统</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// &#x1F517; 从 Markdown 文本中提取 @include 路径</span>
+<span class="cm">// 支持三种路径格式：</span>
+<span class="cm">//   @./relative-path.md   (相对路径)</span>
+<span class="cm">//   @~/home-path.md       (主目录)</span>
+<span class="cm">//   @/absolute-path.md    (绝对路径)</span>
+
+<span class="kw">const</span> <span class="param">MAX_INCLUDE_DEPTH</span> = <span class="num">5</span>
+  <span class="cm">// &#x1F6E1; 防止循环引用：A引用B、B引用A</span>
+  <span class="cm">// 最多递归 5 层就停止</span>
+
+<span class="cm">// ============================================</span>
+<span class="cm">// 条件规则匹配 —— 只在特定场景激活</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export async function</span> <span class="fn">processConditionedMdRules</span>(
+  <span class="param">targetPath</span>: <span class="type">string</span>,  <span class="cm">// 正在编辑的文件</span>
+  <span class="param">rulesDir</span>: <span class="type">string</span>,    <span class="cm">// .claude/rules/ 目录</span>
+): <span class="type">Promise</span>&lt;<span class="type">MemoryFileInfo</span>[]&gt; {
+
+  <span class="cm">// &#x1F4C1; 读取 rules 目录下所有 .md 文件</span>
+  <span class="kw">const</span> <span class="param">ruleFiles</span> = <span class="kw">await</span> <span class="fn">readDir</span>(rulesDir)
+
+  <span class="kw">for</span> (<span class="kw">const</span> <span class="param">file</span> <span class="kw">of</span> ruleFiles) {
+    <span class="cm">// &#x1F50D; 解析 frontmatter 中的 paths 字段</span>
+    <span class="cm">// 例如: paths: src/**/*.ts</span>
+    <span class="kw">const</span> { <span class="param">paths</span> } = <span class="fn">parseFrontmatter</span>(file)
+
+    <span class="cm">// &#x1F3AF; 用 glob 模式匹配当前编辑的文件</span>
+    <span class="kw">if</span> (<span class="fn">matchesGlob</span>(targetPath, paths)) {
+      <span class="cm">// &#x2705; 匹配成功！把这条规则加载到上下文中</span>
+      results.<span class="fn">push</span>(ruleContent)
+    }
+    <span class="cm">// &#x274C; 不匹配？跳过，节省 token</span>
+  }
+
+  <span class="kw">return</span> results
+}</div>
+      </div>
+    </div>
+
+    <!-- 上下文压缩 -->
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F4E6; 上下文压缩 — 图书管理员整理书架</h3>
+        <p>AI 的记忆窗口是有限的（比如 200K token）。当对话太长时，Claude Code 会启动<strong>自动压缩</strong>。</p>
+
+        <div class="highlight-box purple">
+          <strong>压缩的原则：</strong>不是简单地删掉旧消息！而是让 AI 先写一份"会议纪要"，总结之前的内容。这份纪要保留了所有重要信息：用户的需求、已修改的文件、遇到的错误和解决方案。
+        </div>
+
+        <p>更精妙的是<strong>工具结果清除策略</strong>：当 token 超过阈值时，系统会清除旧的工具调用结果（比如大量的搜索结果），但<strong>保留文件编辑记录</strong>——因为编辑记录是"承重墙"，删掉会影响 AI 理解代码的当前状态。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/services/compact/prompt.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 上下文压缩 —— 为 AI 写"会议纪要"</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// 压缩指令告诉 AI 要总结什么：</span>
+<span class="kw">const</span> <span class="param">COMPACT_INSTRUCTIONS</span> = <span class="str">`
+你的任务是为这段对话写一份详细的摘要。
+必须包含以下内容：
+
+1. 用户的核心需求和意图
+2. 关键技术概念
+3. 涉及的文件和代码片段（保留完整代码！）
+4. 遇到的错误和修复方案
+5. 所有用户消息（不仅仅是工具结果）
+6. 待完成的任务
+7. 当前工作状态
+`</span>
+
+<span class="cm">// &#x1F9F9; 工具结果清除策略</span>
+<span class="cm">// 可清除的工具（搜索类，结果可重新获取）：</span>
+<span class="kw">const</span> <span class="param">CLEARABLE_TOOLS</span> = [
+  <span class="str">'Bash'</span>, <span class="str">'Glob'</span>, <span class="str">'Grep'</span>, <span class="str">'Read'</span>,
+  <span class="str">'WebFetch'</span>, <span class="str">'WebSearch'</span>,
+]
+<span class="cm">// &#x26A0;&#xFE0F; 不可清除的工具（编辑类，是承重墙）：</span>
+<span class="cm">// Edit, Write, NotebookEdit</span>
+<span class="cm">// 因为清除编辑记录会让 AI 忘记</span>
+<span class="cm">// 文件的当前状态！</span></div>
+      </div>
+    </div>
+
+    <!-- 缓存分界策略 -->
+    <div class="callout insight fade-in">
+      <div class="callout-title">&#x1F4A1; 缓存分界策略 — 系统提示词的巧妙切割</div>
+      <p>系统提示词被一条"分界线"(<code>SYSTEM_PROMPT_DYNAMIC_BOUNDARY</code>) 切成两半：</p>
+      <p><strong>分界线之前</strong>：通用指令（"你是 Claude Code"、"如何使用工具"）—— 这部分对所有用户都一样，可以<strong>全局缓存</strong>，所有人共用一份。</p>
+      <p><strong>分界线之后</strong>：个性化内容（你的 CLAUDE.md、记忆文件、环境信息）—— 每个人不同，不能缓存。</p>
+      <p>这一刀切得精妙绝伦：全局缓存意味着 Anthropic 的服务器只需要处理一次通用指令，之后所有用户的请求都能复用——<strong>大幅降低延迟和成本</strong>。</p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 7 — 钩子与自动化
+     ═══════════════════════════════════════════════════════════ -->
+<section id="hooks">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(249,115,22,0.15);">&#x1F3ED;</div>
+      <h2>钩子与自动化 &middot; 质检流水线</h2>
+      <p>25 个 Hook 事件 + Agent 系统 = 一套可以自我驱动的自动化流水线</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      Hook 系统就像工厂流水线上的<strong>质检站</strong>。产品（工具调用）在流水线上移动，每到一个检查站就要停下来接受检查。质检站可以做三件事：<strong>放行</strong>（工具照常执行）、<strong>拦截</strong>（阻止工具执行，退回返工）、<strong>标注</strong>（在产品上贴个备注，让下一站知道情况）。最酷的是：你可以自定义质检规则，让工厂按你的标准运行！
+    </div>
+
+    <!-- Hook 事件流程 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 24px; color: var(--text-secondary);">一个工具调用经历的 Hook 管道</h3>
+      <div class="flow">
+        <div class="flow-node cyan">PreToolUse</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node green">执行工具</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node purple">PostToolUse</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node amber">结果反馈</div>
+      </div>
+      <div style="text-align:center; margin-top: 16px; color: var(--text-muted); font-size: 0.85rem;">
+        PreToolUse 可以拦截（exit code 2）| PostToolUse 可以注入额外上下文
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F3A3; Hook 执行 — 异步生成器管道</h3>
+        <p>Hook 的执行结果不是一个简单的 true/false，而是一个<strong>流式管道</strong>——每个 Hook 可以产出多种类型的结果。</p>
+
+        <div class="highlight-box">
+          <strong>Hook 可以做的事：</strong>
+          <br>&#x2022; 返回附加消息（让 AI 知道额外信息）
+          <br>&#x2022; 阻止工具执行（exit code 2）
+          <br>&#x2022; 修改工具输出
+          <br>&#x2022; 注入额外上下文
+          <br>&#x2022; 阻止对话继续
+        </div>
+
+        <div class="highlight-box amber">
+          <strong>自我纠错的闭环：</strong>最精彩的 Hook 是 <code>TeammateIdle</code>——当一个 AI 子代理准备"下班"时，这个 Hook 会检查任务队列里还有没有未完成的工作。如果有，Hook 返回 exit code 2，<strong>阻止它休息</strong>，让它继续干活！这就是"自驱动"闭环。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/services/tools/toolHooks.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// PostToolUse Hook 管道</span>
+<span class="cm">// 工具执行完毕后的"质检站"</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export async function</span>* <span class="fn">runPostToolUseHooks</span>(
+  <span class="param">tool</span>: <span class="type">Tool</span>,
+  <span class="param">toolInput</span>: <span class="type">Record</span>&lt;<span class="type">string</span>, <span class="type">unknown</span>&gt;,
+  <span class="param">toolResponse</span>: <span class="type">Output</span>,
+): <span class="type">AsyncGenerator</span>&lt;<span class="type">PostToolUseHooksResult</span>&gt; {
+
+  <span class="cm">// &#x1F3ED; 遍历所有注册的 PostToolUse Hook</span>
+  <span class="kw">for await</span> (<span class="kw">const</span> <span class="param">result</span> <span class="kw">of</span>
+    <span class="fn">executePostToolHooks</span>(...)) {
+
+    <span class="cm">// &#x1F4E8; Hook 可以返回附加消息</span>
+    <span class="cm">// 比如：格式检查结果、性能报告</span>
+    <span class="kw">if</span> (result.<span class="prop">message</span>) {
+      <span class="kw">yield</span> { message: result.message }
+    }
+
+    <span class="cm">// &#x1F6AB; Hook 可以阻止后续流程</span>
+    <span class="kw">if</span> (result.<span class="prop">blockingError</span>) {
+      <span class="kw">yield</span> { blockingError: result.blockingError }
+    }
+
+    <span class="cm">// &#x1F4DD; Hook 可以注入额外上下文</span>
+    <span class="cm">// 让 AI 在下一轮对话中能看到这些信息</span>
+    <span class="kw">if</span> (result.<span class="prop">additionalContexts</span>?.length) {
+      <span class="kw">yield</span> {
+        message: <span class="fn">createAttachmentMessage</span>({
+          type: <span class="str">'hook_additional_context'</span>,
+          content: result.additionalContexts,
+        })
+      }
+    }
+  }
+}
+
+<span class="cm">// ============================================</span>
+<span class="cm">// TeammateIdle Hook —— 自驱动闭环</span>
+<span class="cm">// exit code 2 = 阻止空闲，继续工作！</span>
+<span class="cm">// ============================================</span></div>
+      </div>
+    </div>
+
+    <!-- Agent 子代理系统 -->
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F916; Agent 子代理 — 分身术</h3>
+        <p>Claude Code 可以<strong>生成子代理</strong>来并行处理任务。主代理就像一个项目经理，把任务分配给多个"分身"同时执行。</p>
+
+        <div class="highlight-box green">
+          <strong>递归的美：</strong>子代理本身也能调用工具、触发 Hook、甚至再生成子代理。这形成了一个<strong>树状的执行图</strong>。每个代理都有独立的权限上下文、独立的消息历史，但共享同一套 Hook 管道。
+        </div>
+
+        <p>子代理的权限被严格限制：<code>mode: 'dontAsk'</code> 表示它不能弹窗询问用户，只能操作已授权的内容。这确保了自动化流程不会卡住等待人工确认。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/tools/AgentTool/AgentTool.tsx</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// AgentTool —— AI 的"分身术"</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">const</span> <span class="param">inputSchema</span> = z.<span class="fn">object</span>({
+
+  <span class="cm">// &#x1F4DD; 3-5 个词描述任务</span>
+  <span class="prop">description</span>: z.<span class="fn">string</span>(),
+
+  <span class="cm">// &#x1F4AC; 完整的任务指令</span>
+  <span class="prop">prompt</span>: z.<span class="fn">string</span>(),
+
+  <span class="cm">// &#x1F3AF; 子代理类型</span>
+  <span class="cm">// Explore = 快速代码搜索</span>
+  <span class="cm">// Plan = 架构设计</span>
+  <span class="cm">// general-purpose = 通用任务</span>
+  <span class="prop">subagent_type</span>: z.<span class="fn">string</span>().<span class="fn">optional</span>(),
+
+  <span class="cm">// &#x1F3C3; 后台运行？</span>
+  <span class="cm">// true = 不等结果，继续做其他事</span>
+  <span class="prop">run_in_background</span>: z.<span class="fn">boolean</span>().<span class="fn">optional</span>(),
+
+  <span class="cm">// &#x1F4DB; 给子代理起名字</span>
+  <span class="cm">// 命名后可以用 SendMessage 给它发消息</span>
+  <span class="prop">name</span>: z.<span class="fn">string</span>().<span class="fn">optional</span>(),
+})
+
+<span class="cm">// &#x1F512; 子代理的权限被严格限制：</span>
+<span class="cm">// mode: 'dontAsk' —— 不能弹窗问用户</span>
+<span class="cm">// 只能操作已经被授权的内容</span>
+<span class="cm">// 确保自动化流程不会卡住</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 8 — 终端渲染魔法
+     ═══════════════════════════════════════════════════════════ -->
+<section id="rendering">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(244,63,94,0.15);">&#x1F3A8;</div>
+      <h2>终端渲染魔法</h2>
+      <p>在一个只有文字的终端里，Claude Code 实现了 60FPS 的流畅渲染 —— 用的是游戏引擎的思路</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      终端渲染就像<strong>翻页动画</strong>。每一帧是一张完整的画面。你手里有两张纸（双缓冲）：一张是当前画面，另一张是下一帧。画好下一帧后，你不是擦掉重画，而是<strong>找出哪里不一样</strong>（差分算法），只改变那几个像素。如果一个区域没变化？直接把旧画面上的那块"复印"过来（Blit 块传输）。这就是为什么在终端里看 AI 打字也能如丝般顺滑。
+    </div>
+
+    <!-- 渲染管线 -->
+    <div class="arch-diagram fade-in">
+      <h3 style="text-align:center; margin-bottom: 24px; color: var(--text-secondary);">终端渲染三阶段管线</h3>
+      <div class="flow">
+        <div class="flow-node purple">React 组件</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node blue">Yoga 布局计算</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node cyan">虚拟 DOM 树</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node green">屏幕缓冲区</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node amber">差分比较</div>
+        <div class="flow-arrow">&rarr;</div>
+        <div class="flow-node rose">终端输出</div>
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F3AE; Blit 优化 — 游戏引擎的智慧</h3>
+        <p>Blit（Block Image Transfer，块图像传输）是游戏引擎中常见的渲染优化技术。Claude Code 把它搬到了终端渲染中。</p>
+
+        <div class="highlight-box">
+          <strong>核心原理：</strong>如果一个组件的位置和大小都没变，就直接把上一帧的那个区域"复印"过来，整个子树的渲染都跳过！
+        </div>
+
+        <p>这段代码是渲染引擎的核心优化点。<code>nodeCache</code> 记录了每个组件在上一帧的位置和大小。如果位置没变，就调用 <code>blit()</code> 直接复制，<strong>跳过整个子树</strong>。</p>
+
+        <div class="highlight-box purple">
+          <strong>实际效果：</strong>当 AI 正在流式输出文字时，屏幕上只有最后几行在变化。上面的内容全部通过 Blit 复制——工作量从 O(屏幕面积) 降低到 O(变化的单元格数)。
+        </div>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/ink/render-node-to-output.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// Blit 优化 —— 从游戏引擎借来的智慧</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// &#x1F50D; 从缓存中查找这个节点上一帧的位置</span>
+<span class="kw">const</span> <span class="param">cached</span> = nodeCache.<span class="fn">get</span>(node)
+
+<span class="cm">// &#x2753; 这个节点没有变化？</span>
+<span class="cm">// 位置和大小都和上一帧一样？</span>
+<span class="kw">if</span> (
+  !node.<span class="prop">dirty</span> &amp;&amp;      <span class="cm">// 内容没变</span>
+  cached &amp;&amp;              <span class="cm">// 有缓存记录</span>
+  cached.<span class="prop">x</span> === x &amp;&amp;     <span class="cm">// X 坐标没变</span>
+  cached.<span class="prop">y</span> === y &amp;&amp;     <span class="cm">// Y 坐标没变</span>
+  cached.<span class="prop">width</span> === width &amp;&amp;
+  cached.<span class="prop">height</span> === height &amp;&amp;
+  prevScreen              <span class="cm">// 有上一帧的数据</span>
+) {
+  <span class="cm">// &#x1F3AE; Blit! 直接"复印"上一帧的这块区域</span>
+  <span class="cm">// 整个子树的渲染全部跳过！</span>
+  output.<span class="fn">blit</span>(prevScreen, fx, fy, fw, fh)
+  <span class="kw">return</span> <span class="cm">// &#x26A1; 提前返回，省去大量计算</span>
+}
+
+<span class="cm">// 如果位置变了，才需要重新渲染这个节点</span>
+<span class="cm">// ...</span>
+
+<span class="cm">// ============================================</span>
+<span class="cm">// 双缓冲机制 —— 两张画布轮流使用</span>
+<span class="cm">// ============================================</span>
+<span class="cm">//</span>
+<span class="cm">// frontFrame = 当前显示的画面</span>
+<span class="cm">// backFrame  = 正在绘制的下一帧</span>
+<span class="cm">//</span>
+<span class="cm">// 画完后交换：</span>
+<span class="cm">//   backFrame  = frontFrame  (旧画布回收)</span>
+<span class="cm">//   frontFrame = newFrame    (新画布上屏)</span>
+<span class="cm">//</span>
+<span class="cm">// 好处：不需要每帧都分配新的内存</span></div>
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F4E6; 打包单元格 — 极致的内存优化</h3>
+        <p>终端上的每个字符都需要记录：字符内容、样式（颜色/粗体）、宽度、超链接。Claude Code 把这些信息<strong>压缩成两个 32 位整数</strong>。</p>
+
+        <div class="highlight-box green">
+          <strong>为什么用 TypedArray?</strong>
+          <br>&#x2022; 一个单元格 = 8 字节 = CPU 一个缓存行能放 8 个
+          <br>&#x2022; 批量复制用 <code>TypedArray.set()</code>，比逐个赋值快 10 倍
+          <br>&#x2022; 位操作 <code>styleId &amp; 1</code> 就能判断空格是否可见
+        </div>
+
+        <p>还有一个巧妙的<strong>字符池</strong>和<strong>样式池</strong>设计：常见字符（ASCII）通过数组直接查找（O(1)），样式转换（从样式 A 切换到样式 B 的 ANSI 代码）被预计算并缓存——渲染时零内存分配！</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/ink/screen.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 打包单元格 —— 两个 uint32 装下一切</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// 每个终端字符 = 2 个 uint32（共 8 字节）</span>
+<span class="cm">//</span>
+<span class="cm">// Word 0: [31 位 styleId] [1 位 可见空格标记]</span>
+<span class="cm">// Word 1: [16 位 charId] [8 位 宽度] [8 位 超链接]</span>
+
+<span class="cm">// ============================================</span>
+<span class="cm">// 字符池 —— ASCII 极速查表</span>
+<span class="cm">// ============================================</span>
+
+<span class="kw">export class</span> <span class="type">CharPool</span> {
+
+  <span class="cm">// &#x1F4DA; 预置字符：索引 0 = 空格，1 = 空</span>
+  <span class="kw">private</span> <span class="prop">strings</span>: <span class="type">string</span>[] = [<span class="str">' '</span>, <span class="str">''</span>]
+
+  <span class="cm">// &#x26A1; ASCII 快速通道：直接用字符编码做索引</span>
+  <span class="kw">private</span> <span class="prop">ascii</span>: <span class="type">Int32Array</span> = <span class="fn">initCharAscii</span>()
+
+  <span class="fn">intern</span>(<span class="param">char</span>: <span class="type">string</span>): <span class="type">number</span> {
+    <span class="kw">const</span> <span class="param">code</span> = char.<span class="fn">charCodeAt</span>(<span class="num">0</span>)
+
+    <span class="cm">// ASCII 字符？直接查表，O(1)！</span>
+    <span class="kw">if</span> (char.length === <span class="num">1</span> &amp;&amp; code &lt; <span class="num">128</span>) {
+      <span class="kw">return</span> <span class="kw">this</span>.ascii[code]
+    }
+
+    <span class="cm">// 非 ASCII（中文、emoji 等）</span>
+    <span class="cm">// 用 Map 查找，稍慢但也很高效</span>
+    <span class="kw">return</span> <span class="kw">this</span>.map.<span class="fn">get</span>(char) ?? <span class="kw">this</span>.<span class="fn">add</span>(char)
+  }
+}
+
+<span class="cm">// ============================================</span>
+<span class="cm">// 样式池 —— 预计算样式转换</span>
+<span class="cm">// ============================================</span>
+<span class="cm">//</span>
+<span class="cm">// transition(fromId, toId) → ANSI 转义序列</span>
+<span class="cm">// 例如：从"红色粗体"切到"绿色正常"</span>
+<span class="cm">// 结果被缓存，下次直接取，零分配！</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 9 — 安全堡垒
+     ═══════════════════════════════════════════════════════════ -->
+<section id="safety">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: rgba(244,63,94,0.15);">&#x1F3F0;</div>
+      <h2>安全堡垒 &middot; 纵深防御</h2>
+      <p>从路径攻击防御到引号智能保留 —— Claude Code 的安全设计令人叹为观止</p>
+    </div>
+
+    <div class="metaphor fade-in">
+      <div class="metaphor-title">生活化比喻</div>
+      安全系统就像一座<strong>中世纪城堡</strong>。外面有护城河（路径规范化检查），城门有卫兵（危险文件清单），城墙上有弓箭手（符号链接解析），城内还有层层关卡（权限决策树）。即使有人偷偷绕过一道防线，下一道防线也会把它挡住——这叫<strong>「纵深防御」(Defense in Depth)</strong>。
+    </div>
+
+    <div class="feature-grid fade-in">
+      <div class="feature-card">
+        <h4 style="color: var(--accent-rose);">&#x1F6AB; 危险文件保护</h4>
+        <p><code>.bashrc</code>、<code>.gitconfig</code>、<code>.zshrc</code> 等文件被列入黑名单。这些文件可以在系统启动时执行代码，修改它们相当于打开了后门。即使用户主动授权，也会被额外警告。</p>
+      </div>
+      <div class="feature-card">
+        <h4 style="color: var(--accent-amber);">&#x1F50D; Windows 路径攻击防御</h4>
+        <p>检测 NTFS 备用数据流 (<code>file.txt::$DATA</code>)、8.3 短名称 (<code>GIT~1</code>)、DOS 设备名 (<code>.git.CON</code>) 等 Windows 特有的路径伪装技巧。防止通过路径花招绕过安全检查。</p>
+      </div>
+      <div class="feature-card">
+        <h4 style="color: var(--accent-blue);">&#x1F517; 符号链接追踪</h4>
+        <p>检查文件时，不仅检查文件本身，还追踪整条符号链接链。即使 <code>safe-file</code> 是一个指向 <code>/etc/passwd</code> 的链接，也会被发现和拦截。</p>
+      </div>
+      <div class="feature-card">
+        <h4 style="color: var(--accent-green);">&#x1F520; 大小写不敏感保护</h4>
+        <p>在 macOS 和 Windows 上，<code>.Claude</code> 和 <code>.claude</code> 是同一个目录。所有路径比较都先转成小写，防止通过大小写混写绕过检查。</p>
+      </div>
+      <div class="feature-card">
+        <h4 style="color: var(--accent-purple);">&#x270D;&#xFE0F; 智能引号保留</h4>
+        <p>如果文件里用的是弯引号 (&ldquo;&rdquo;)，编辑后自动保持弯引号风格。甚至能区分缩写中的撇号 (don&rsquo;t) 和收尾引号——用 Unicode 正则匹配字母来判断。</p>
+      </div>
+      <div class="feature-card">
+        <h4 style="color: var(--accent-cyan);">&#x23F0; 文件陈旧检测</h4>
+        <p>编辑文件前检查：文件是否在你读取之后被其他程序修改了？Windows 上时间戳可能被云同步软件篡改，所以额外做内容比对来防止误判。</p>
+      </div>
+    </div>
+
+    <div class="split fade-in">
+      <div class="split-explain">
+        <h3>&#x1F6E1;&#xFE0F; 写入权限决策树</h3>
+        <p>这是安全系统最核心的代码之一 —— 文件写入操作要过<strong>8 道检查</strong>。</p>
+
+        <div class="highlight-box">
+          <strong>关键设计：安全检查在 allow 规则之前！</strong>
+          <br>即使用户配置了宽泛的 allow 规则（比如"允许编辑所有文件"），危险文件仍然会被拦截。这防止了"好心办坏事"的情况。
+        </div>
+
+        <p>注意第 4 步和第 5 步的顺序。在大多数系统中，allow 规则会直接放行。但 Claude Code <strong>先做安全检查，再看 allow 规则</strong>。这是一个精妙的设计决策——把安全性放在便利性之上。</p>
+      </div>
+
+      <div class="code-block">
+        <div class="code-header">
+          <span class="filename">src/utils/permissions/filesystem.ts</span>
+          <span class="lang-tag">TypeScript</span>
+        </div>
+        <div class="code-body"><span class="cm">// ============================================</span>
+<span class="cm">// 文件写入权限 —— 8 道安检门</span>
+<span class="cm">// ============================================</span>
+
+<span class="cm">// &#9312; 显式拒绝规则 —— 黑名单直接拦截</span>
+<span class="kw">if</span> (<span class="fn">matchesDenyRule</span>(path)) <span class="kw">return</span> <span class="str">'deny'</span>
+
+<span class="cm">// &#9313; 内部可编辑路径 —— 计划文件、草稿本</span>
+<span class="kw">if</span> (<span class="fn">isInternalEditable</span>(path)) <span class="kw">return</span> <span class="str">'allow'</span>
+
+<span class="cm">// &#9314; Claude 文件夹会话规则</span>
+<span class="kw">if</span> (<span class="fn">isClaudeFolderSessionRule</span>(path)) <span class="kw">return</span> <span class="str">'allow'</span>
+
+<span class="cm">// &#9315; &#x26A0;&#xFE0F; 安全检查 —— 在 allow 之前！</span>
+<span class="cm">// 即使用户配置了宽泛的 allow 规则，</span>
+<span class="cm">// 危险文件仍然会被拦截</span>
+<span class="kw">if</span> (<span class="fn">isDangerousFile</span>(path)) {
+  <span class="kw">return</span> <span class="str">'ask'</span>  <span class="cm">// 强制询问用户确认</span>
+}
+
+<span class="cm">// &#9316; 显式询问规则</span>
+<span class="kw">if</span> (<span class="fn">matchesAskRule</span>(path)) <span class="kw">return</span> <span class="str">'ask'</span>
+
+<span class="cm">// &#9317; 工作目录自动允许</span>
+<span class="cm">// 如果是 acceptEdits 模式</span>
+<span class="kw">if</span> (<span class="fn">isInWorkingDir</span>(path) &amp;&amp; mode === <span class="str">'acceptEdits'</span>)
+  <span class="kw">return</span> <span class="str">'allow'</span>
+
+<span class="cm">// &#9318; 显式允许规则</span>
+<span class="kw">if</span> (<span class="fn">matchesAllowRule</span>(path)) <span class="kw">return</span> <span class="str">'allow'</span>
+
+<span class="cm">// &#9319; 默认 —— 没有任何规则匹配？</span>
+<span class="cm">// 安全起见，询问用户</span>
+<span class="kw">return</span> <span class="str">'ask'</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SECTION 10 — 设计哲学总结
+     ═══════════════════════════════════════════════════════════ -->
+<section id="philosophy">
+  <div class="container">
+    <div class="section-header fade-in">
+      <div class="section-icon" style="background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(59,130,246,0.2));">&#x2728;</div>
+      <h2>设计哲学总结</h2>
+      <p>从 1,902 个源文件中提炼出的架构智慧 —— 这些原则适用于所有软件项目</p>
+    </div>
+
+    <div class="feature-grid fade-in">
+      <div class="feature-card" style="border-top: 3px solid var(--accent-purple);">
+        <h4>&#x1F3CE;&#xFE0F; 快速路径优先</h4>
+        <p>最常见的操作走最短的路径。<code>--version</code> 不加载任何模块。90% 的性能优化来自于<strong>"不做不需要做的事"</strong>。</p>
+      </div>
+      <div class="feature-card" style="border-top: 3px solid var(--accent-blue);">
+        <h4>&#x1F3A3; 流式一切</h4>
+        <p>AsyncGenerator 贯穿全栈：API 响应、工具结果、Hook 输出都是流式的。用户永远不用等"全部加载完"才能看到结果。</p>
+      </div>
+      <div class="feature-card" style="border-top: 3px solid var(--accent-green);">
+        <h4>&#x1F6E1;&#xFE0F; 纵深防御</h4>
+        <p>安全不依赖单一检查。权限系统有 8 层、文件系统有 6 种攻击防御、路径检查覆盖原始路径和符号链接解析后的路径。</p>
+      </div>
+      <div class="feature-card" style="border-top: 3px solid var(--accent-amber);">
+        <h4>&#x1F504; 自我纠错闭环</h4>
+        <p>拒绝追踪发现分类器出错时自动退回人工确认。TeammateIdle Hook 防止子代理提前结束。系统能<strong>检测并修复自己的问题</strong>。</p>
+      </div>
+      <div class="feature-card" style="border-top: 3px solid var(--accent-cyan);">
+        <h4>&#x1F4E6; 数据驱动 > 硬编码</h4>
+        <p>权限规则是数据、工具是可组合的接口、Hook 是声明式配置。添加新功能不需要改动核心逻辑——只需要添加数据。</p>
+      </div>
+      <div class="feature-card" style="border-top: 3px solid var(--accent-rose);">
+        <h4>&#x1F3AD; 编译时 > 运行时</h4>
+        <p>Feature Gate 在编译时裁剪代码、缓存分界在构建时确定、样式转换在启动时预计算。把工作提前到<strong>能提前的最早时刻</strong>。</p>
+      </div>
+    </div>
+
+    <div class="callout insight fade-in" style="max-width: 800px; margin: 40px auto;">
+      <div class="callout-title">&#x1F4A1; 写给编程新手的一句话</div>
+      <p style="font-size: 1.1rem; color: var(--text-primary);">
+        优秀的架构不是让代码变"复杂"，而是让复杂的系统变得<strong>可理解</strong>。
+      </p>
+      <p>
+        Claude Code 有 1,902 个文件，但每个模块都有清晰的职责边界。工具系统用统一接口让 40+ 工具和谐共处，权限系统用声明式规则替代了无尽的 if/else，渲染引擎用游戏级优化让终端也能丝滑如奶。
+      </p>
+      <p>
+        当你开始写自己的项目时，记住这个核心原则：<strong>先画蓝图，再砌砖。先定接口，再写实现。先想清楚数据怎么流动，再考虑每个节点怎么处理。</strong>
+      </p>
+    </div>
+  </div>
+</section>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     FOOTER
+     ═══════════════════════════════════════════════════════════ -->
+<footer class="footer">
+  <p>
+    Claude Code 源码解读报告 &middot;
+    源码来自 <a href="https://github.com/anthropics/claude-code" target="_blank">Anthropic Claude Code</a> &middot;
+    Made with Claude Opus 4.6
+  </p>
+  <p style="margin-top: 8px; color: var(--text-muted);">
+    本报告基于公开源码分析生成，仅供学习交流
+  </p>
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════
+     Intersection Observer for fade-in animations
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+});
+</script>
+
+</body>
+</html>
